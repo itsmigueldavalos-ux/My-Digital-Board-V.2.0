@@ -26,7 +26,7 @@
       }
       .wrap { max-width: 1500px; margin: 0 auto; padding: 20px; }
 
-      /* TOPBAR: left panel (toggle + last updated), center title+today+clock, right controls */
+      /* TOPBAR: left panel (toggle + last updated), center title+date+clock, right controls */
       .topbar {
         display: grid;
         grid-template-columns: 1fr auto 1fr;
@@ -47,12 +47,10 @@
         align-items: flex-start;
         min-width: 0;
       }
-
       .boardToggle {
         width: 360px;
         max-width: 100%;
       }
-
       .metaLeft {
         font-size: 12px;
         color: var(--muted);
@@ -112,9 +110,15 @@
       }
       button { cursor: pointer; }
       button.primary { background: rgba(29,185,84,.15); border-color: rgba(29,185,84,.35); }
-      button.danger { background: rgba(255,77,77,.12); border-color: rgba(255,77,77,.35); }
       button.lock { background: rgba(255,176,32,.14); border-color: rgba(255,176,32,.35); }
       button.lock.active { background: rgba(255,77,77,.14); border-color: rgba(255,77,77,.35); }
+
+      /* smaller lock/unlock button */
+      .smallBtn {
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 10px;
+      }
 
       .board {
         margin-top: 14px;
@@ -349,6 +353,7 @@
           return "snhu_na";
         }
 
+        // Dedup the 4 canonical SNHU badges; keep their current column if user moved them
         function normalizeSnhuCards(cards) {
           const canonical = snhuCanonicalCards();
           const canonById = new Map(canonical.map(c => [c.id, c]));
@@ -377,6 +382,7 @@
           const raw = localStorage.getItem(storageKey);
           const parsed = raw ? safeParse(raw, defaultState()) : defaultState();
 
+          // staffing normalize
           parsed.staffing = parsed.staffing || { cards: [] };
           parsed.staffing.cards = Array.isArray(parsed.staffing.cards) ? parsed.staffing.cards : [];
           parsed.staffing.cards = parsed.staffing.cards.map((c) => ({ ...c, col: migrateStaffingCol(c.col) }));
@@ -386,6 +392,7 @@
           );
           if (!hasMiguel) parsed.staffing.cards = [miguelCard(), ...parsed.staffing.cards];
 
+          // snhu normalize
           parsed.university = parsed.university || { cards: [] };
           parsed.university.cards = Array.isArray(parsed.university.cards) ? parsed.university.cards : [];
           parsed.university.cards = parsed.university.cards.map((c) => ({ ...c, col: migrateSnhuCol(c.col) }));
@@ -406,11 +413,6 @@
         useEffect(() => {
           localStorage.setItem(lockKey, isLocked ? "1" : "0");
         }, [isLocked, lockKey]);
-
-        function resetBoards() {
-          if (isLocked) { showToast("Locked. Unlock to reset."); return; }
-          touchUpdate(defaultState());
-        }
 
         function lockNow() {
           setIsLocked(true);
@@ -454,17 +456,14 @@
                 </div>
               </div>
 
-              {/* RIGHT: buttons only */}
+              {/* RIGHT: lock/unlock only (smaller) */}
               <div className="rightPanel">
                 <div className="controls">
                   {isLocked ? (
-                    <button className="lock active" onClick={requestUnlock} title="Unlock board">Unlock</button>
+                    <button className="lock active smallBtn" onClick={requestUnlock} title="Unlock board">Unlock</button>
                   ) : (
-                    <button className="lock" onClick={lockNow} title="Lock makes the board view-only">Lock Board</button>
+                    <button className="lock smallBtn" onClick={lockNow} title="Lock makes the board view-only">Lock</button>
                   )}
-                  <button className="danger" onClick={resetBoards} title="Resets boards">
-                    Reset Boards
-                  </button>
                 </div>
               </div>
             </div>
