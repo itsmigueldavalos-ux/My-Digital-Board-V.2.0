@@ -138,7 +138,6 @@
       .subHeader span{font-size:12px;color:rgba(255,255,255,.65)}
       .subBody{padding:10px;display:flex;flex-direction:column;gap:10px;min-height:80px}
 
-      /* Column select toggle (like board toggle) */
       .colToggleWrap{padding:0 12px 12px 12px}
       .colToggle{width:100%;max-width:100%}
 
@@ -295,7 +294,6 @@
       /***********************
        * Board Definitions
        ***********************/
-      // ✅ Amazon columns (5)
       const AMAZON_COLS = [
         {
           key: "stow",
@@ -343,12 +341,6 @@
         { key: "exp", title: "Expected Employee", dropKey: "staff_expected" },
       ];
 
-      // ✅ SNHU columns (4): My Class Schedule + Current Assignments + Current Term + Upcoming Term sections inside schedule
-      const SNHU_COLS = [
-        { key: "sched", title: "My Class Schedule", kind: "schedule" },
-        { key: "assign", title: "Current Assignments", kind: "assignments" },
-      ];
-
       const WEEK_OPTIONS = ["Week 1","Week 2","Week 3","Week 4","Week 5","Week 6","Week 7","Week 8"];
       const PROGRESS_OPTIONS = ["Not Started","In Progress"];
 
@@ -360,6 +352,13 @@
       const nowStamp = () => new Date().toLocaleString();
 
       function safeParse(json, fallback) { try { return JSON.parse(json); } catch { return fallback; } }
+
+      // ✅ Prevent draggable parent from blocking dropdown clicks
+      function stopDragInterference(e){
+        e.stopPropagation();
+        // prevent browser from treating click as drag on some elements
+        if (e.type === "dragstart") e.preventDefault();
+      }
 
       function App() {
         const loginName = "migudavc";
@@ -374,19 +373,16 @@
           return () => clearInterval(t);
         }, []);
 
-        // Lock
         const lockKey = useMemo(() => `swb_locked_${loginName}`, [loginName]);
         const [isLocked, setIsLocked] = useState(() => localStorage.getItem(lockKey) === "1");
         const [unlockModalOpen, setUnlockModalOpen] = useState(false);
 
-        // Storage
         const storageKey = useMemo(() => `swb_state_${loginName}`, [loginName]);
         const [state, setState] = useState(() => {
           const raw = localStorage.getItem(storageKey);
           return raw ? safeParse(raw, null) : null;
         });
 
-        // ✅ Amazon column selects (persisted)
         const [selStow, setSelStow] = useState(() => localStorage.getItem("sel_stow") || "stow_pg");
         const [selPick, setSelPick] = useState(() => localStorage.getItem("sel_pick") || "pick_pg");
         const [selLS, setSelLS] = useState(() => localStorage.getItem("sel_ls") || "ls_in_ps");
@@ -396,20 +392,16 @@
         useEffect(() => localStorage.setItem("sel_ls", selLS), [selLS]);
         useEffect(() => localStorage.setItem("sel_ps", selPS), [selPS]);
 
-        // ✅ SNHU Week select (like board toggle)
         const [weekFilter, setWeekFilter] = useState(() => localStorage.getItem("snhu_week_filter") || "Week 1");
         useEffect(() => localStorage.setItem("snhu_week_filter", weekFilter), [weekFilter]);
 
-        // ✅ SNHU: Add Course modal
         const [addCourseOpen, setAddCourseOpen] = useState(false);
         const [cTitle, setCTitle] = useState("");
-        const [cTerm, setCTerm] = useState("Current Term"); // Current Term | Upcoming Term
+        const [cTerm, setCTerm] = useState("Current Term");
 
-        // ✅ SNHU: Delete Course modal
         const [delCourseOpen, setDelCourseOpen] = useState(false);
         const [delCourseId, setDelCourseId] = useState("");
 
-        // ✅ SNHU: Add Assignment modal (still)
         const [addAssignOpen, setAddAssignOpen] = useState(false);
         const [aTitle, setATitle] = useState("");
         const [aCourse, setACourse] = useState("");
@@ -422,7 +414,6 @@
           showToast._t = window.setTimeout(() => setToast(""), 1800);
         }
 
-        // ✅ Fixed ID so photo persists forever
         function miguelCard() {
           return {
             id: "staff-migudavc",
@@ -430,8 +421,8 @@
             login: "migudavc",
             shiftCoHost: "DB3T0700",
             shiftPattern: "Back Half Days",
-            col: "staff_expected", // Expected Employee default
-            presence: "IN",        // IN | OUT
+            col: "staff_expected",
+            presence: "IN",
             createdBy: "migudavc",
             createdAt: new Date().toISOString(),
           };
@@ -440,15 +431,10 @@
         function defaultState() {
           return {
             staffing: { cards: [miguelCard()] },
-            snhu: {
-              // ✅ No default courses or assignments
-              courses: [],
-              assignments: [],
-            },
+            snhu: { courses: [], assignments: [] },
           };
         }
 
-        // Normalize / migrate Amazon col keys to only allowed ones
         function amazonValidCols() {
           const s = new Set(["staff_expected"]);
           for (const col of AMAZON_COLS) {
@@ -461,12 +447,9 @@
         function migrateAmazonCol(oldCol) {
           const valid = amazonValidCols();
           if (valid.has(oldCol)) return oldCol;
-
-          // If an old key matches earlier builds, drop to Expected Employee
           return "staff_expected";
         }
 
-        // SNHU migrations
         function migrateSnhuTerm(oldTerm) {
           return oldTerm === "Upcoming Term" ? "Upcoming Term" : "Current Term";
         }
@@ -477,12 +460,10 @@
           return PROGRESS_OPTIONS.includes(p) ? p : "Not Started";
         }
 
-        // Load state + ensure Miguel exists + rehydrate photo presence from IndexedDB (via URL)
         useEffect(() => {
           const raw = localStorage.getItem(storageKey);
           const parsed = raw ? safeParse(raw, defaultState()) : defaultState();
 
-          // Staffing
           parsed.staffing = parsed.staffing || { cards: [] };
           parsed.staffing.cards = Array.isArray(parsed.staffing.cards) ? parsed.staffing.cards : [];
           parsed.staffing.cards = parsed.staffing.cards.map((c) => ({
@@ -494,7 +475,6 @@
           const hasMiguel = parsed.staffing.cards.some((c) => c && c.id === "staff-migudavc");
           if (!hasMiguel) parsed.staffing.cards = [miguelCard(), ...parsed.staffing.cards];
 
-          // SNHU
           parsed.snhu = parsed.snhu || { courses: [], assignments: [] };
           parsed.snhu.courses = Array.isArray(parsed.snhu.courses) ? parsed.snhu.courses : [];
           parsed.snhu.assignments = Array.isArray(parsed.snhu.assignments) ? parsed.snhu.assignments : [];
@@ -503,7 +483,6 @@
             ...c,
             termBucket: migrateSnhuTerm(c.termBucket),
           }));
-
           parsed.snhu.assignments = parsed.snhu.assignments.map((a) => ({
             ...a,
             week: migrateSnhuWeek(a.week),
@@ -512,19 +491,15 @@
 
           setState(parsed);
 
-          // Rehydrate photo URLs (from IndexedDB)
           (async () => {
             try {
               const blob = await idbGet("photo:staff-migudavc");
               if (blob) {
                 const url = URL.createObjectURL(blob);
-                // store temp runtime url on window cache; actual data is in IndexedDB
                 window.__photoUrlCache = window.__photoUrlCache || {};
                 window.__photoUrlCache["staff-migudavc"] = url;
               }
-            } catch {
-              // ignore
-            }
+            } catch {}
           })();
         }, [storageKey]);
 
@@ -544,10 +519,11 @@
         function requestUnlock() { setUnlockModalOpen(true); }
         function unlockNow() { setIsLocked(false); setUnlockModalOpen(false); showToast("Board unlocked."); }
 
-        // ✅ HC counts only IN on Amazon; hidden entirely on SNHU
-        const hc = useMemo(() => (state?.staffing?.cards || []).filter(c => (c?.presence || "IN") === "IN").length, [state]);
+        const hc = useMemo(
+          () => (state?.staffing?.cards || []).filter(c => (c?.presence || "IN") === "IN").length,
+          [state]
+        );
 
-        // SNHU: open modals
         function openAddCourse() {
           if (isLocked) { showToast("Locked. Unlock to edit."); return; }
           setCTitle(""); setCTerm("Current Term");
@@ -573,10 +549,7 @@
           };
           const next = {
             ...state,
-            snhu: {
-              ...state.snhu,
-              courses: [course, ...(state.snhu.courses || [])],
-            },
+            snhu: { ...state.snhu, courses: [course, ...(state.snhu.courses || [])] },
           };
           touchUpdate(next);
           setAddCourseOpen(false);
@@ -615,28 +588,19 @@
             progress: "Not Started",
             createdAt: new Date().toISOString(),
           };
-          const next = {
-            ...state,
-            snhu: { ...state.snhu, assignments: [assign, ...(state.snhu.assignments || [])] }
-          };
+          const next = { ...state, snhu: { ...state.snhu, assignments: [assign, ...(state.snhu.assignments || [])] } };
           touchUpdate(next);
           setAddAssignOpen(false);
           showToast("Assignment added.");
         }
 
-        // Amazon: update staffing card
         function updateStaffCard(id, patch) {
           if (isLocked) { showToast("Locked. Unlock to edit."); return; }
           const nextCards = (state.staffing.cards || []).map(c => (c.id === id ? { ...c, ...patch } : c));
           touchUpdate({ ...state, staffing: { ...state.staffing, cards: nextCards } });
         }
+        function moveStaffCard(cardId, newCol) { updateStaffCard(cardId, { col: newCol }); }
 
-        // Amazon: move staffing card
-        function moveStaffCard(cardId, newCol) {
-          updateStaffCard(cardId, { col: newCol });
-        }
-
-        // Photo: set / persist in IndexedDB
         async function setMiguelPhoto(file) {
           if (isLocked) { showToast("Locked. Unlock to edit."); return; }
           if (!file) return;
@@ -650,7 +614,6 @@
             window.__photoUrlCache = window.__photoUrlCache || {};
             window.__photoUrlCache["staff-migudavc"] = url;
             showToast("Photo saved.");
-            // no need to touchUpdate; photo is external to localStorage now
           } catch {
             showToast("Could not save photo.");
           }
@@ -662,10 +625,17 @@
           <div className="wrap">
             <div className="topbar">
               <div className="leftPanel">
-                <select className="boardToggle" value={activeBoard} onChange={(e) => setActiveBoard(e.target.value)}>
+                <select
+                  className="boardToggle"
+                  value={activeBoard}
+                  onChange={(e) => setActiveBoard(e.target.value)}
+                  onPointerDown={stopDragInterference}
+                  onMouseDown={stopDragInterference}
+                >
                   <option value="amazon">Amazon Workplace: Demorians Department</option>
                   <option value="snhu">Southern New Hampshire University (SNHU)</option>
                 </select>
+
                 <div className="metaLeft">
                   <span><strong>Last Updated:</strong> {lastUpdated}</span>
                 </div>
@@ -687,7 +657,6 @@
                   )}
                 </div>
 
-                {/* ✅ Remove HC from SNHU board only */}
                 {activeBoard === "amazon" ? (
                   <div className="hcLine"><strong>HC:</strong>&nbsp;{hc}</div>
                 ) : null}
@@ -739,7 +708,6 @@
               </div>
             ) : null}
 
-            {/* Add Course */}
             {addCourseOpen ? (
               <div className="modalBack" onClick={() => setAddCourseOpen(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -759,7 +727,6 @@
               </div>
             ) : null}
 
-            {/* Delete Course */}
             {delCourseOpen ? (
               <div className="modalBack" onClick={() => setDelCourseOpen(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -779,7 +746,6 @@
               </div>
             ) : null}
 
-            {/* Add Assignment */}
             {addAssignOpen ? (
               <div className="modalBack" onClick={() => setAddAssignOpen(false)}>
                 <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -802,9 +768,6 @@
         );
       }
 
-      /***********************
-       * Amazon Board
-       ***********************/
       function AmazonBoard({
         state, isLocked, showToast,
         selStow, setSelStow,
@@ -839,10 +802,8 @@
           setDragOverKey(null);
         }
 
-        // Build buckets
         const buckets = useMemo(() => {
           const m = {};
-          // all option buckets + expected
           for (const col of AMAZON_COLS){
             if (col.options) for (const o of col.options) m[o.key] = [];
             if (col.dropKey) m[col.dropKey] = [];
@@ -885,7 +846,7 @@
               <div className="cardTop">
                 <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
                   {isMiguel ? (
-                    <div className="photoSlot">
+                    <div className="photoSlot" onPointerDown={stopDragInterference} onMouseDown={stopDragInterference}>
                       {photoUrl(card.id) ? (
                         <img src={photoUrl(card.id)} alt="Photo" />
                       ) : (
@@ -893,7 +854,6 @@
                           Image<br/>Upload
                         </label>
                       )}
-                      {/* clickable overlay to change photo */}
                       <label
                         className="photoBtn"
                         htmlFor={inputId}
@@ -907,12 +867,17 @@
                     <p className="name">{card.personName} ({card.login})</p>
                     <div className="subline">{card.shiftCoHost} - {card.shiftPattern}</div>
 
-                    <div className="statusRow">
+                    <div className="statusRow" onPointerDown={stopDragInterference} onMouseDown={stopDragInterference}>
                       <span className={"pill " + (presence === "IN" ? "in" : "out")}>
                         {presence}
                       </span>
 
+                      {/* ✅ Make the select fully clickable even inside draggable card */}
                       <select
+                        draggable={false}
+                        onDragStart={stopDragInterference}
+                        onPointerDown={stopDragInterference}
+                        onMouseDown={stopDragInterference}
                         value={presence}
                         disabled={isLocked}
                         onChange={(e) => updateStaffCard(card.id, { presence: e.target.value })}
@@ -932,7 +897,6 @@
           );
         }
 
-        // Helpers to render a "selected section" within a column
         function renderSelectedColumn(col, selectedKey, setSelectedKey){
           const selected = (col.options || []).find(o => o.key === selectedKey) || (col.options || [])[0];
           const bucketKey = selected ? selected.key : null;
@@ -951,6 +915,10 @@
                   value={selectedKey}
                   onChange={(e) => setSelectedKey(e.target.value)}
                   disabled={isLocked}
+                  draggable={false}
+                  onDragStart={stopDragInterference}
+                  onPointerDown={stopDragInterference}
+                  onMouseDown={stopDragInterference}
                   title={`Select ${col.title} section`}
                 >
                   {(col.options || []).map((o) => (
@@ -981,7 +949,6 @@
           );
         }
 
-        // Expected Employee (no subsections)
         const expectedList = buckets["staff_expected"] || [];
 
         return (
@@ -1016,9 +983,6 @@
         );
       }
 
-      /***********************
-       * SNHU Board
-       ***********************/
       function SnhuBoard({
         snhu, onChange, isLocked, showToast,
         weekFilter, setWeekFilter,
@@ -1032,7 +996,6 @@
         const courses = snhu.courses || [];
         const assignments = snhu.assignments || [];
 
-        // Buckets for schedule sections
         const courseBuckets = useMemo(() => {
           const m = { current: [], upcoming: [] };
           for (const c of courses){
@@ -1042,7 +1005,6 @@
           return m;
         }, [courses]);
 
-        // Filter assignments by current week filter and split by progress
         const asnByProgress = useMemo(() => {
           const m = { ns: [], ip: [] };
           for (const a of assignments){
@@ -1141,8 +1103,12 @@
                   {(a.course ? a.course + " • " : "")}{a.term}{a.dueDate ? " • Due: " + fmtDue(a.dueDate) : ""}
                 </div>
 
-                <div className="assignMetaRow">
+                <div className="assignMetaRow" onPointerDown={stopDragInterference} onMouseDown={stopDragInterference}>
                   <select
+                    draggable={false}
+                    onDragStart={stopDragInterference}
+                    onPointerDown={stopDragInterference}
+                    onMouseDown={stopDragInterference}
                     value={WEEK_OPTIONS.includes(a.week) ? a.week : "Week 1"}
                     disabled={isLocked}
                     onChange={(e) => updateAssignment(a.id, { week: e.target.value })}
@@ -1152,6 +1118,10 @@
                   </select>
 
                   <select
+                    draggable={false}
+                    onDragStart={stopDragInterference}
+                    onPointerDown={stopDragInterference}
+                    onMouseDown={stopDragInterference}
                     value={PROGRESS_OPTIONS.includes(a.progress) ? a.progress : "Not Started"}
                     disabled={isLocked}
                     onChange={(e) => updateAssignment(a.id, { progress: e.target.value })}
@@ -1168,18 +1138,16 @@
 
         return (
           <div className="board" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
-            {/* My Class Schedule */}
             <div className="col">
               <div className="colHeader">
                 <h2>My Class Schedule</h2>
-                <div className="courseActionsRow">
+                <div className="courseActionsRow" onPointerDown={stopDragInterference} onMouseDown={stopDragInterference}>
                   <button className="primary smallBtn" onClick={onOpenAddCourse} disabled={isLocked}>Add Course</button>
                   <button className="dangerBtn smallBtn" onClick={onOpenDeleteCourse} disabled={isLocked}>Delete Course</button>
                 </div>
               </div>
 
               <div className="dropZone">
-                {/* Current Term section */}
                 <div
                   className={"subsection " + (!isLocked && dragOverKey === "sched_current" ? "dragOver" : "")}
                   onDragOverCapture={(e) => { allowDrop(e); if (!isLocked) setDragOverKey("sched_current"); }}
@@ -1197,7 +1165,6 @@
                   </div>
                 </div>
 
-                {/* Upcoming Term section */}
                 <div
                   className={"subsection " + (!isLocked && dragOverKey === "sched_upcoming" ? "dragOver" : "")}
                   onDragOverCapture={(e) => { allowDrop(e); if (!isLocked) setDragOverKey("sched_upcoming"); }}
@@ -1217,22 +1184,24 @@
               </div>
             </div>
 
-            {/* Current Assignments */}
             <div className="col">
               <div className="colHeader">
                 <h2>Current Assignments</h2>
-                <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                <div style={{ display:"flex", gap:10, alignItems:"center" }} onPointerDown={stopDragInterference} onMouseDown={stopDragInterference}>
                   <button className="primary smallBtn" onClick={onOpenAddAssignment} disabled={isLocked}>Add Assignment</button>
                 </div>
               </div>
 
-              {/* Week select toggle below column header (like board toggle) */}
               <div className="colToggleWrap">
                 <select
                   className="colToggle"
                   value={weekFilter}
                   onChange={(e) => setWeekFilter(e.target.value)}
                   disabled={isLocked}
+                  draggable={false}
+                  onDragStart={stopDragInterference}
+                  onPointerDown={stopDragInterference}
+                  onMouseDown={stopDragInterference}
                   title="Select week"
                 >
                   {WEEK_OPTIONS.map(w => <option key={w} value={w}>{w}</option>)}
@@ -1240,7 +1209,6 @@
               </div>
 
               <div className="dropZone">
-                {/* Not Started */}
                 <div
                   className={"subsection " + (!isLocked && dragOverKey === "asn_ns" ? "dragOver" : "")}
                   onDragOverCapture={(e) => { allowDrop(e); if (!isLocked) setDragOverKey("asn_ns"); }}
@@ -1258,7 +1226,6 @@
                   </div>
                 </div>
 
-                {/* In Progress */}
                 <div
                   className={"subsection " + (!isLocked && dragOverKey === "asn_ip" ? "dragOver" : "")}
                   onDragOverCapture={(e) => { allowDrop(e); if (!isLocked) setDragOverKey("asn_ip"); }}
